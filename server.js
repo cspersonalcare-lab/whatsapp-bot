@@ -13,6 +13,20 @@ Parli come una segreteria reale, con tono umano, rassicurante e professionale.
 Non fai diagnosi e non gestisci emergenze.
 `;
 
+app.get("/webhook", (req, res) => {
+  const VERIFY_TOKEN = "personalcare123";
+
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  if (mode && token === VERIFY_TOKEN) {
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
+  }
+});
+
 app.post("/webhook", async (req, res) => {
   const msg = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
   if (!msg) return res.sendStatus(200);
