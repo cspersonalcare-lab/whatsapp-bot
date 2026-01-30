@@ -15,7 +15,6 @@ Non fai diagnosi e non gestisci emergenze.
 
 app.get("/webhook", (req, res) => {
   const VERIFY_TOKEN = "personalcare123";
-
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
