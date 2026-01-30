@@ -3,25 +3,26 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-// 🔹 DATI DA INSERIRE
-const OPENAI_KEY = process.env.OPENAI_KEY;        // chiave OpenAI
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;       // token Meta WhatsApp Cloud API
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID; // ID numero WhatsApp
-const VERIFY_TOKEN = "personalcare123";                 // token verifica Meta
+// 🔹 PRENDIAMO LE CHIAVI DALLE VARIABILI D'AMBIENTE
+const OPENAI_KEY = process.env.OPENAI_KEY;
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const VERIFY_TOKEN = "personalcare123"; // token di verifica webhook Meta
 
-// 🔹 PROMPT PERSONALCARE AVANZATO (tutto integrato)
+// 🔹 PROMPT PERSONALCARE AVANZATO (gestione naturale, emergenze, urgenze, preventivi, candidature)
 const PERSONALCARE_PROMPT = `
 Sei l'assistente digitale di orientamento socio-sanitario collegato al servizio Personal Care.
-Rispondi in modo umano, chiaro e rassicurante, adattando il tono a chi scrive (conosciuto o meno, linguaggio formale/informale).
+Rispondi in modo umano, chiaro, rassicurante e adattivo in base a chi scrive (conosciuto o meno, linguaggio formale/informale).
 Non fare diagnosi, non dare terapie, non interpretare referti.
 Gestisci emergenze consigliando di chiamare 118 o medico.
 Gestisci urgenze informando che il servizio prenderà in carico la richiesta e che farai sapere se potrà essere risolta.
-Organizza preventivi, candidature lavoro, orientamento socio-sanitario, consulenza logistica.
+Organizza preventivi, candidature lavoro (badanti, OSS, infermieri, ecc.), orientamento socio-sanitario e consulenza logistica.
 Segui sempre la sequenza: empatia → spiegazione → orientamento → limite professionale → passaggio al consulente.
 Rispondi a qualsiasi testo dell'utente, senza usare parole chiave predefinite.
+Mantieni risposte brevi, chiare e coerenti, ma adattive al contesto e alla persona.
 `;
 
-// 🌟 GET per verifica Meta
+// 🌟 GET per verifica webhook Meta
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -34,7 +35,7 @@ app.get("/webhook", (req, res) => {
   }
 });
 
-// 🌟 POST per ricevere messaggi
+// 🌟 POST per ricevere i messaggi WhatsApp
 app.post("/webhook", async (req, res) => {
   try {
     const msg = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
@@ -46,7 +47,7 @@ app.post("/webhook", async (req, res) => {
     console.log("Messaggio ricevuto da:", from);
     console.log("Testo:", userText);
 
-    // 🔹 Chiamata a OpenAI GPT-4 con prompt integrato
+    // 🔹 Chiamata OpenAI GPT-4
     const openaiResponse = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
@@ -55,14 +56,17 @@ app.post("/webhook", async (req, res) => {
           { role: "system", content: PERSONALCARE_PROMPT },
           { role: "user", content: userText }
         ],
-        temperature: 0.7
+        temperature: 0.7,
+        max_tokens: 600
       },
-      { headers: { Authorization: `Bearer ${OPENAI_KEY}` } }
+      {
+        headers: { Authorization: `Bearer ${OPENAI_KEY}` }
+      }
     );
 
     let replyText = openaiResponse.data.choices[0].message.content;
 
-    // 🔹 Gestione emergenze / urgenze
+    // 🔹 Gestione emergenze / urgenze (controllo rapido)
     const emergencyKeywords = ["infarto", "forte dolore al petto", "incidente grave"];
     const urgencyKeywords = ["urgente", "subito", "molto importante"];
 
@@ -75,7 +79,7 @@ app.post("/webhook", async (req, res) => {
       replyText += "\nIl servizio prenderà in carico la tua richiesta e ti informeremo se potrà essere risolta.";
     }
 
-    // 🔹 Invio risposta su WhatsApp
+    // 🔹 Invio risposta WhatsApp
     await axios.post(
       `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
       {
