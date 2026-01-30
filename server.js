@@ -3,13 +3,13 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-// 🔹 PRENDIAMO LE CHIAVI DALLE VARIABILI D'AMBIENTE
-const OPENAI_KEY = process.env.OPENAI_KEY;
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-const VERIFY_TOKEN = "personalcare123"; // token di verifica webhook Meta
+// 🔹 CHIAVI DA VARIABILI D'AMBIENTE (Render)
+const OPENAI_KEY = process.env.OPENAI_KEY;       // Chiave OpenAI
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN; // Token WhatsApp Cloud API
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID; // ID numero WhatsApp
+const VERIFY_TOKEN = "personalcare123";          // Token verifica webhook Meta
 
-// 🔹 PROMPT PERSONALCARE AVANZATO (gestione naturale, emergenze, urgenze, preventivi, candidature)
+// 🔹 PROMPT PERSONALCARE AVANZATO
 const PERSONALCARE_PROMPT = `
 Sei l'assistente digitale di orientamento socio-sanitario collegato al servizio Personal Care.
 Rispondi in modo umano, chiaro, rassicurante e adattivo in base a chi scrive (conosciuto o meno, linguaggio formale/informale).
@@ -22,7 +22,7 @@ Rispondi a qualsiasi testo dell'utente, senza usare parole chiave predefinite.
 Mantieni risposte brevi, chiare e coerenti, ma adattive al contesto e alla persona.
 `;
 
-// 🌟 GET per verifica webhook Meta
+// 🌟 GET webhook Meta per verifica
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -35,7 +35,7 @@ app.get("/webhook", (req, res) => {
   }
 });
 
-// 🌟 POST per ricevere i messaggi WhatsApp
+// 🌟 POST webhook per ricevere messaggi WhatsApp
 app.post("/webhook", async (req, res) => {
   try {
     const msg = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
@@ -47,11 +47,11 @@ app.post("/webhook", async (req, res) => {
     console.log("Messaggio ricevuto da:", from);
     console.log("Testo:", userText);
 
-    // 🔹 Chiamata OpenAI GPT-4
+    // 🔹 Chiamata a OpenAI GPT-3.5 (gratuito)
     const openaiResponse = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
-        model: "gpt-4",
+        model: "gpt-3.5-turbo",   // versione gratuita
         messages: [
           { role: "system", content: PERSONALCARE_PROMPT },
           { role: "user", content: userText }
@@ -66,7 +66,7 @@ app.post("/webhook", async (req, res) => {
 
     let replyText = openaiResponse.data.choices[0].message.content;
 
-    // 🔹 Gestione emergenze / urgenze (controllo rapido)
+    // 🔹 Controllo emergenze / urgenze
     const emergencyKeywords = ["infarto", "forte dolore al petto", "incidente grave"];
     const urgencyKeywords = ["urgente", "subito", "molto importante"];
 
@@ -79,7 +79,7 @@ app.post("/webhook", async (req, res) => {
       replyText += "\nIl servizio prenderà in carico la tua richiesta e ti informeremo se potrà essere risolta.";
     }
 
-    // 🔹 Invio risposta WhatsApp
+    // 🔹 Invio risposta a WhatsApp
     await axios.post(
       `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
       {
